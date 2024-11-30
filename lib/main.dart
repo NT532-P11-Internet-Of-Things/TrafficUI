@@ -50,10 +50,10 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   late List<int> timers2;
   bool timerUpdated2 = false;
 
-  final ref1 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/remaining_time");
-  final ref2 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/2/remaining_time");
-  final ref3 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/3/remaining_time");
-  final ref4 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/4/remaining_time");
+  final ref1 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/green_time");
+  final ref2 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/2/green_time");
+  final ref3 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/3/green_time");
+  final ref4 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/4/green_time");
 
   @override
   void initState() {
