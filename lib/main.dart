@@ -264,23 +264,23 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
               ],
             ),
           ),
-          Center(
-            child: TextField(
-              decoration: InputDecoration(
-                labelText: "Set den 1",
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.check),
-                  onPressed: () {
-                    String temp = controller3.text;
-                    int index = int.parse(temp.split(" ")[0]);
-                    int timer = int.parse(temp.split(" ")[1]);
-                    updateState(index, timer);
-                  },
-                ),
-              ),
-              controller: controller3,
-            ),
-          ),
+          // Center(
+          //   child: TextField(
+          //     decoration: InputDecoration(
+          //       labelText: "Set den 1",
+          //       suffixIcon: IconButton(
+          //         icon: Icon(Icons.check),
+          //         onPressed: () {
+          //           String temp = controller3.text;
+          //           int index = int.parse(temp.split(" ")[0]);
+          //           int timer = int.parse(temp.split(" ")[1]);
+          //           updateState(index, timer);
+          //         },
+          //       ),
+          //     ),
+          //     controller: controller3,
+          //   ),
+          // ),
 
           Center(
             child: Row(
