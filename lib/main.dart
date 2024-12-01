@@ -37,14 +37,15 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
 
   TextEditingController controller = TextEditingController();
   TextEditingController controller2 = TextEditingController();
+  TextEditingController controller3 = TextEditingController();
   int redTimer2 = 13;
   int yellowTimer2 = 3;
   int greenTimer2 = 7;
 
   bool isAuto = true;
 
-  Offset controlPanelPosition = Offset(10, 10);
-  late int currentTimer1;
+  Offset controlPanelPosition = const Offset(10, 10);
+  late int currentTimer1; // 0 - Green, 1 - Yellow, 2 - Red
   late int currentIndex1;
   late List<int> timers1;
   bool timerUpdated1 = false;
@@ -73,12 +74,12 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   @override
   void initState() {
     super.initState();
-    currentIndex1 = 2; // Set initial index to green
+    currentIndex1 = 2; // Set initial index to red
     timers1 = [greenTimer1, yellowTimer1, redTimer1];
     currentTimer1 = timers1[currentIndex1];
     startTimer1();
 
-    currentIndex2 = 0; // Set initial index to red
+    currentIndex2 = 0; // Set initial index to green
     timers2 = [greenTimer2, yellowTimer2, redTimer2];
     currentTimer2 = timers2[currentIndex2];
     startTimer2();
@@ -152,6 +153,39 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     });
   }
 
+  void updateState(int index, int timer) {
+    setState(() {
+      // nếu chuyển sang đèn xanh, còn lớn hơn 3 thì đèn kia chuyển sang đỏ, thòi gian còn của đèn kia bằng đèn này cộng thêm 3, còn nếu ít hơn 3s thì đèn kia thành vàng, thòi gian còn lại bằng thời gian của đèn này
+      // nếu chuyển sang đỏ, thời gian còn ít hơn 3s thì đèn kia chuyển sang vàng, thời gian còn bằng thời gian đèn này, còn nếu lớn hơn 3s đèn kia chuyển sang xanh, thời gian còn lại bằng thời gian của đèn này - 3
+      if (index == 0) { // Đèn xanh
+        currentIndex1 = index;
+        if (timer > 3) {
+          currentIndex2 = 2; // Đèn đỏ
+          currentTimer2 = timer + 3;
+        } else {
+          currentIndex2 = 1; // Đèn vàng
+          currentTimer2 = timer;
+        }
+      } else if (index == 1) { // Đèn vàng
+        currentIndex1 = index;
+        currentIndex2 = 2; // Đèn đỏ
+        currentTimer1 = timer;
+        currentTimer2 = timer;
+      } else { // Đèn đỏ
+        currentIndex1 = index;
+        if (timer > 3) {
+          currentIndex2 = 0; // Đèn xanh
+          currentTimer2 = timer - 3;
+        } else {
+          currentIndex2 = 1; // Đèn vàng
+          currentTimer2 = timer;
+        }
+      }
+      currentTimer1 = timer;
+    });
+  }
+
+
   void setTimer1(int green1, int red1) {
     setState(() {
       redTimer1 = red1;
@@ -182,7 +216,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
           // Background
           Positioned.fill(
             child: Image.asset(
-              'assets/background.jpg', // Đặt hình nền đã tải ở thư mục assets
+              'assets/background.jpg',
               fit: BoxFit.cover,
             ),
           ),
@@ -193,6 +227,23 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                 buildLane(1, lane1),
                 buildLane(3, lane3),
               ],
+            ),
+          ),
+          Center(
+            child: TextField(
+              decoration: InputDecoration(
+                labelText: "Set den 1",
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.check),
+                  onPressed: () {
+                    String temp = controller3.text;
+                    int index = int.parse(temp.split(" ")[0]);
+                    int timer = int.parse(temp.split(" ")[1]);
+                    updateState(index, timer);
+                  },
+                ),
+              ),
+              controller: controller3,
             ),
           ),
 
