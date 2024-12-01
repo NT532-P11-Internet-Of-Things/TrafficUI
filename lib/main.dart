@@ -34,6 +34,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   int redTimer1 = 10;
   int yellowTimer1 = 3;
   int greenTimer1 = 10;
+  int greenChangeCounter = 0;
 
   TextEditingController controller = TextEditingController();
   TextEditingController controller2 = TextEditingController();
@@ -66,6 +67,10 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   final lane4Ref = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/4/vehicle_count");
 
   final autoRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/isAuto");
+  final remainingTimeRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/remaining_time");
+  final isGreenRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/is_green");
+  final needSyncRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/needSync");
+
   int lane1 = 0;
   int lane2 = 0;
   int lane3 = 0;
@@ -85,6 +90,35 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     startTimer2();
 
     fetchTrafficLight();
+    listenToIsGreenRef();
+    remainingTimeRef.get().then((value) => {
+      if (value.value != null) {
+          updateState(0, value.value as int)
+      }
+    });
+
+  }
+
+  void listenToIsGreenRef() {
+    isGreenRef.onValue.listen((DatabaseEvent event) async {
+      bool isGreen = event.snapshot.value as bool;
+      int remainingTime = await remainingTimeRef.get().then((value) => value.value as int);
+      if (isGreen) {
+        greenChangeCounter++;
+        if (greenChangeCounter >= 3) {
+          updateState(0, remainingTime); // Example call to updateState
+          greenChangeCounter = 0;
+        }
+      }
+    });
+
+    needSyncRef.onValue.listen((DatabaseEvent event) async {
+      bool needSync = event.snapshot.value as bool;
+      if (needSync) {
+        updateState(2, 3);
+        needSyncRef.set(false);
+      }
+    });
   }
 
   void startTimer1() {
@@ -122,6 +156,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   }
 
   void nextCycle() {
+    needSyncRef.set(true);
     setState(() {
       if (currentIndex1 == 0) {
         // Green to Yellow
@@ -507,7 +542,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
           ElevatedButton(
               onPressed: () {
                 nextCycle();
-                fetchTrafficLight();
+                // fetchTrafficLight();
               },
               child: Text("Chuyển đèn")),
         ],
