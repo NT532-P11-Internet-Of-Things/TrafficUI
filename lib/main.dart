@@ -194,13 +194,8 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
       // nếu chuyển sang đỏ, thời gian còn ít hơn 3s thì đèn kia chuyển sang vàng, thời gian còn bằng thời gian đèn này, còn nếu lớn hơn 3s đèn kia chuyển sang xanh, thời gian còn lại bằng thời gian của đèn này - 3
       if (index == 0) { // Đèn xanh
         currentIndex1 = index;
-        if (timer > 3) {
-          currentIndex2 = 2; // Đèn đỏ
-          currentTimer2 = timer + 3;
-        } else {
-          currentIndex2 = 1; // Đèn vàng
-          currentTimer2 = timer;
-        }
+        currentIndex2 = 2; // Đèn đỏ
+        currentTimer2 = timer + 3;
       } else if (index == 1) { // Đèn vàng
         currentIndex1 = index;
         currentIndex2 = 2; // Đèn đỏ
@@ -307,7 +302,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                           style: TextStyle(color: Colors.white),
                         ),
                         buildTrafficLight(currentTimer1, currentIndex1),
-                        buildTimer(redTimer1, greenTimer1),
+                        buildTimer(true),
                       ],
                     ),
                     // Center(
@@ -334,7 +329,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                           style: TextStyle(color: Colors.white),
                         ),
                         buildTrafficLight(currentTimer2, currentIndex2),
-                        buildTimer(redTimer2, greenTimer2),
+                        buildTimer(false),
                       ],
                     ),
                   ],
@@ -349,7 +344,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                           style: TextStyle(color: Colors.white),
                         ),
                         buildTrafficLight(currentTimer2, currentIndex2),
-                        buildTimer(redTimer2, greenTimer2),
+                        buildTimer(false),
                       ],
                     ),
                     Column(
@@ -359,7 +354,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                           style: TextStyle(color: Colors.white),
                         ),
                         buildTrafficLight(currentTimer1, currentIndex1),
-                        buildTimer(redTimer1, greenTimer1),
+                        buildTimer(true),
                       ],
                     ),
 
@@ -550,14 +545,51 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     );
   }
 
-  Widget buildTimer(int redTimer1, int greenTimer1) {
+  Widget buildTimer(bool isOdd) {
+    int redTimer;
+    int greenTimer;
+    String text;
+    if (isOdd)
+    {
+      redTimer = redTimer1;
+      greenTimer = greenTimer1;
+      if (currentIndex1 == 0)
+      {
+        text = "Đèn xanh: $greenTimer1 s";
+      }
+      else if (currentIndex1 == 1)
+      {
+        text = "Đèn vàng: $yellowTimer1 s";
+      }
+      else
+      {
+        text = "Đèn đỏ: $redTimer1 s";
+      }
+    }
+    else
+    {
+      redTimer = redTimer2;
+      greenTimer = greenTimer2;
+      if (currentIndex2 == 0)
+      {
+        text = "Đèn xanh: $greenTimer2 s";
+      }
+      else if (currentIndex2 == 1)
+      {
+        text = "Đèn vàng: $yellowTimer2 s";
+      }
+      else
+      {
+        text = "Đèn đỏ: $redTimer2 s";
+      }
+    }
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text("Đèn đỏ: $redTimer1 s, Đèn xanh: $greenTimer1 s",
+      child: Text(text,
           style: TextStyle(color: Colors.black)),
     );
   }
