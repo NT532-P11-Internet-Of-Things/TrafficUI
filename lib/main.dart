@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
@@ -31,6 +32,27 @@ class TrafficSimulationScreen extends StatefulWidget {
 }
 
 class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
+  late DatabaseReference ref1;
+  late DatabaseReference ref2;
+  late DatabaseReference ref3;
+  late DatabaseReference ref4;
+  late DatabaseReference lane1Ref;
+  late DatabaseReference lane2Ref;
+  late DatabaseReference lane3Ref;
+  late DatabaseReference lane4Ref;
+  late DatabaseReference autoRef;
+  late DatabaseReference remainingTime1Ref;
+  late DatabaseReference remainingTime2Ref;
+  late DatabaseReference remainingTime3Ref;
+  late DatabaseReference remainingTime4Ref;
+
+
+  late DatabaseReference isGreen1Ref;
+  late DatabaseReference isGreen2Ref;
+  late DatabaseReference isGreen3Ref;
+  late DatabaseReference isGreen4Ref;
+  late DatabaseReference needSyncRef;
+
   int redTimer1 = 10;
   int yellowTimer1 = 3;
   int greenTimer1 = 10;
@@ -56,29 +78,17 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   late List<int> timers2;
   bool timerUpdated2 = false;
 
-  final ref1 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/green_time");
-  final ref2 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/2/green_time");
-  final ref3 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/3/green_time");
-  final ref4 = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/4/green_time");
-
-  final lane1Ref = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/vehicle_count");
-  final lane2Ref = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/2/vehicle_count");
-  final lane3Ref = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/3/vehicle_count");
-  final lane4Ref = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/4/vehicle_count");
-
-  final autoRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/isAuto");
-  final remainingTimeRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/remaining_time");
-  final isGreenRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/lanes/1/is_green");
-  final needSyncRef = FirebaseDatabase.instance.ref("traffic_system/intersections/main_intersection/needSync");
-
   int lane1 = 0;
   int lane2 = 0;
   int lane3 = 0;
   int lane4 = 0;
 
+  late List<double> laneData = [0, 0, 0, 0];
+
   @override
   void initState() {
     super.initState();
+    initializeRefs();
     currentIndex1 = 2; // Set initial index to red
     timers1 = [greenTimer1, yellowTimer1, redTimer1];
     currentTimer1 = timers1[currentIndex1];
@@ -91,7 +101,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
 
     fetchTrafficLight();
     listenToIsGreenRef();
-    remainingTimeRef.get().then((value) => {
+    remainingTime1Ref.get().then((value) => {
       if (value.value != null) {
           updateState(0, value.value as int)
       }
@@ -99,14 +109,38 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
 
   }
 
+  void initializeRefs() {
+    const basePath = "traffic_system/intersections/main_intersection";
+    ref1 = FirebaseDatabase.instance.ref("$basePath/lanes/1/green_time");
+    ref2 = FirebaseDatabase.instance.ref("$basePath/lanes/2/green_time");
+    ref3 = FirebaseDatabase.instance.ref("$basePath/lanes/3/green_time");
+    ref4 = FirebaseDatabase.instance.ref("$basePath/lanes/4/green_time");
+
+    lane1Ref = FirebaseDatabase.instance.ref("$basePath/lanes/1/vehicle_count");
+    lane2Ref = FirebaseDatabase.instance.ref("$basePath/lanes/2/vehicle_count");
+    lane3Ref = FirebaseDatabase.instance.ref("$basePath/lanes/3/vehicle_count");
+    lane4Ref = FirebaseDatabase.instance.ref("$basePath/lanes/4/vehicle_count");
+
+    autoRef = FirebaseDatabase.instance.ref("$basePath/isAuto");
+    remainingTime1Ref = FirebaseDatabase.instance.ref("$basePath/lanes/1/remaining_time");
+    remainingTime2Ref = FirebaseDatabase.instance.ref("$basePath/lanes/2/remaining_time");
+    remainingTime3Ref = FirebaseDatabase.instance.ref("$basePath/lanes/3/remaining_time");
+    remainingTime4Ref = FirebaseDatabase.instance.ref("$basePath/lanes/4/remaining_time");
+    isGreen1Ref = FirebaseDatabase.instance.ref("$basePath/lanes/1/is_green");
+    isGreen2Ref = FirebaseDatabase.instance.ref("$basePath/lanes/2/is_green");
+    isGreen3Ref = FirebaseDatabase.instance.ref("$basePath/lanes/3/is_green");
+    isGreen4Ref = FirebaseDatabase.instance.ref("$basePath/lanes/4/is_green");
+    needSyncRef = FirebaseDatabase.instance.ref("$basePath/needSync");
+  }
+
   void listenToIsGreenRef() {
-    isGreenRef.onValue.listen((DatabaseEvent event) async {
+    isGreen1Ref.onValue.listen((DatabaseEvent event) async {
       bool isGreen = event.snapshot.value as bool;
-      int remainingTime = await remainingTimeRef.get().then((value) => value.value as int);
+      int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
       if (isGreen) {
         greenChangeCounter++;
         if (greenChangeCounter >= 3) {
-          updateState(0, remainingTime); // Example call to updateState
+          updateState(0, remainingTime);
           greenChangeCounter = 0;
         }
       }
@@ -115,7 +149,10 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     needSyncRef.onValue.listen((DatabaseEvent event) async {
       bool needSync = event.snapshot.value as bool;
       if (needSync) {
-        updateState(2, 3);
+        // updateState(2, 3);
+        bool isGreen = await isGreen1Ref.get().then((value) => value.value as bool);
+        int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
+        updateState(isGreen ? 1 : 2, isGreen? 3 : remainingTime);
         needSyncRef.set(false);
       }
     });
@@ -156,35 +193,41 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   }
 
   void nextCycle() {
-    needSyncRef.set(true);
     setState(() {
-      if (currentIndex1 == 0) {
-        // Green to Yellow
-        currentIndex1 = 1;
-        currentTimer1 = yellowTimer1;
-      } else if (currentIndex1 == 1) {
-        // Yellow stays Yellow
-        currentIndex1 = 1;
-        currentTimer1 = yellowTimer1;
-      } else if (currentIndex1 == 2) {
-        // Red to 3 seconds Red
-        currentIndex1 = 2;
-        currentTimer1 = 3;
-      }
-
-      if (currentIndex2 == 0) {
-        // Green to Yellow
-        currentIndex2 = 1;
-        currentTimer2 = yellowTimer2;
-      } else if (currentIndex2 == 1) {
-        // Yellow stays Yellow
-        currentIndex2 = 1;
-        currentTimer2 = yellowTimer2;
-      } else if (currentIndex2 == 2) {
-        // Red to 3 seconds Red
-        currentIndex2 = 2;
-        currentTimer2 = 3;
-      }
+      needSyncRef.set(true);
+      //
+      //   if (currentIndex1 == 0) {
+      //     // Green to Yellow
+      //     currentIndex1 = 1;
+      //     currentTimer1 = yellowTimer1;
+      //   } else if (currentIndex1 == 1) {
+      //     // Yellow stays Yellow
+      //     currentIndex1 = 1;
+      //     currentTimer1 = yellowTimer1;
+      //   } else if (currentIndex1 == 2) {
+      //     // Red to 3 seconds Red
+      //     currentIndex1 = 2;
+      //     currentTimer1 = 3;
+      //   }
+      //
+      //   if (currentIndex2 == 0) {
+      //     // Green to Yellow
+      //     currentIndex2 = 1;
+      //     currentTimer2 = yellowTimer2;
+      //   } else if (currentIndex2 == 1) {
+      //     // Yellow stays Yellow
+      //     currentIndex2 = 1;
+      //     currentTimer2 = yellowTimer2;
+      //   } else if (currentIndex2 == 2) {
+      //     // Red to 3 seconds Red
+      //     currentIndex2 = 2;
+      //     currentTimer2 = 3;
+      //   }
+      // });
+      // isGreen1Ref.set(currentIndex1 == 0);
+      // isGreen2Ref.set(currentIndex2 == 0);
+      // isGreen3Ref.set(currentIndex1 == 0);
+      // isGreen4Ref.set(currentIndex2 == 0);
     });
   }
 
@@ -388,6 +431,16 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
               child: buildControlPanel(),
             ),
           ),
+
+          Center(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                  width: 300,
+                  height: 300,
+                  child: buildChart(context)))
         ],
       ),
     );
@@ -447,24 +500,28 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     lane1Ref.onValue.listen((DatabaseEvent event) {
       setState(() {
         lane1 = event.snapshot.value as int;
+        laneData[0] = lane1.toDouble();
       });
     });
 
     lane2Ref.onValue.listen((DatabaseEvent event) {
       setState(() {
         lane2 = event.snapshot.value as int;
+        laneData[1] = lane2.toDouble();
       });
     });
 
     lane3Ref.onValue.listen((DatabaseEvent event) {
       setState(() {
         lane3 = event.snapshot.value as int;
+        laneData[2] = lane3.toDouble();
       });
     });
 
     lane4Ref.onValue.listen((DatabaseEvent event) {
       setState(() {
         lane4 = event.snapshot.value as int;
+        laneData[3] = lane4.toDouble();
       });
     });
 
@@ -535,12 +592,20 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
               }),
             ],
           ),
-          ElevatedButton(
-              onPressed: () {
-                nextCycle();
-                // fetchTrafficLight();
-              },
-              child: Text("Chuyển đèn")),
+        (currentIndex1 != 1 && currentIndex2 != 1) ?
+            ElevatedButton(
+                onPressed: () {
+                  nextCycle();
+                  // fetchTrafficLight();
+                },
+                child: Text("Chuyển đèn"))
+            :
+        TextButton(
+
+            onPressed: () {
+              // fetchTrafficLight();
+            },
+            child: Text("Chuyển đèn", style: TextStyle(color: Colors.grey)))
         ],
       ),
     );
@@ -609,6 +674,51 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   void setAuto(bool value) {
     isAuto = value;
     autoRef.set(value);
+  }
+
+  Widget buildChart(BuildContext context) {
+    return BarChart(
+        BarChartData(
+          barGroups: laneData
+              .asMap()
+              .entries
+              .map(
+                (entry) => BarChartGroupData(
+              x: entry.key,
+              barRods: [
+                BarChartRodData(
+                  toY: entry.value,
+                  color: Colors.blue,
+                  width: 16,
+                ),
+              ],
+            ),
+          )
+              .toList(),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (double value, TitleMeta meta) {
+                  switch (value.toInt()) {
+                    case 0:
+                      return Text('Lane 1');
+                    case 1:
+                      return Text('Lane 2');
+                    case 2:
+                      return Text('Lane 3');
+                    case 3:
+                      return Text('Lane 4');
+                    default:
+                      return Text('');
+                  }
+                },
+              ),
+            ),
+          ),
+        )
+    );
   }
 }
 
