@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:async/async.dart';
+import 'traffic_chart.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -440,7 +441,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                 ),
                   width: 300,
                   height: 300,
-                  child: buildChart(context)))
+                  child: TrafficLineChart()))
         ],
       ),
     );
@@ -674,51 +675,6 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   void setAuto(bool value) {
     isAuto = value;
     autoRef.set(value);
-  }
-
-  Widget buildChart(BuildContext context) {
-    return BarChart(
-        BarChartData(
-          barGroups: laneData
-              .asMap()
-              .entries
-              .map(
-                (entry) => BarChartGroupData(
-              x: entry.key,
-              barRods: [
-                BarChartRodData(
-                  toY: entry.value,
-                  color: Colors.blue,
-                  width: 16,
-                ),
-              ],
-            ),
-          )
-              .toList(),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (double value, TitleMeta meta) {
-                  switch (value.toInt()) {
-                    case 0:
-                      return Text('Lane 1');
-                    case 1:
-                      return Text('Lane 2');
-                    case 2:
-                      return Text('Lane 3');
-                    case 3:
-                      return Text('Lane 4');
-                    default:
-                      return Text('');
-                  }
-                },
-              ),
-            ),
-          ),
-        )
-    );
   }
 }
 
