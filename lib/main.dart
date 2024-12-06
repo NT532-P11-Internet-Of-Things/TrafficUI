@@ -32,7 +32,7 @@ class TrafficSimulationScreen extends StatefulWidget {
   _TrafficSimulationScreenState createState() => _TrafficSimulationScreenState();
 }
 
-class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
+class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with SingleTickerProviderStateMixin{
   late DatabaseReference ref1;
   late DatabaseReference ref2;
   late DatabaseReference ref3;
@@ -54,6 +54,12 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   late DatabaseReference isGreen4Ref;
   late DatabaseReference needSyncRef;
 
+  late AnimationController _controller;
+  late Animation<Offset> _offsetAnimation;
+  double _panelWidth = 250.0;
+  bool _isPanelVisible = true;
+  final double _minPanelWidth = 150.0;
+
   int redTimer1 = 10;
   int yellowTimer1 = 3;
   int greenTimer1 = 10;
@@ -67,6 +73,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   int greenTimer2 = 7;
 
   bool isAuto = true;
+  bool isShowAll = false;
 
   Offset controlPanelPosition = const Offset(10, 10);
   late int currentTimer1; // 0 - Green, 1 - Yellow, 2 - Red
@@ -85,6 +92,8 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   int lane4 = 0;
 
   late List<double> laneData = [0, 0, 0, 0];
+  Color primary100 = Color.fromARGB(255, 247,244,234);
+  Color primary700 = Color.fromARGB(255, 77,77,55);
 
   @override
   void initState() {
@@ -108,7 +117,32 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
       }
     });
 
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _offsetAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.0),
+      end: const Offset(0.0, 0.0),
+    ).animate(_controller);
   }
+
+  void _toggleDrawer() {
+    if (_controller.isDismissed) {
+      _controller.forward();
+      _isPanelVisible = true;
+    } else {
+      _controller.reverse();
+      _isPanelVisible = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
 
   void initializeRefs() {
     const basePath = "traffic_system/intersections/main_intersection";
@@ -287,68 +321,220 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/background.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                buildLane(1, lane1),
-                buildLane(3, lane3),
-              ],
-            ),
-          ),
 
-          // Center(
-          //   child: TextField(
-          //     decoration: InputDecoration(
-          //       labelText: "Set den 1",
-          //       suffixIcon: IconButton(
-          //         icon: Icon(Icons.check),
-          //         onPressed: () {
-          //           String temp = controller3.text;
-          //           int index = int.parse(temp.split(" ")[0]);
-          //           int timer = int.parse(temp.split(" ")[1]);
-          //           updateState(index, timer);
-          //         },
-          //       ),
-          //     ),
-          //     controller: controller3,
-          //   ),
-          // ),
-
-          Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                buildLane(4, lane4),
-                buildLane(2, lane2),
-              ],
-            ),
-          ),
-
-          // Đèn giao thông 1
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Column(
+          Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 0), // Duration for smooth animation
+                width: _isPanelVisible ? _panelWidth + 20 : 0, //
+                child: SlideTransition(
+                  position: _offsetAnimation,
+                  child: GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        if (!_isPanelVisible) {
+                          _controller.forward();
+                          _isPanelVisible = true;
+                        } else {
+                          _panelWidth += details.primaryDelta!;
+                          if (_panelWidth < _minPanelWidth) {
+                            _panelWidth = _minPanelWidth;
+                            _controller.reverse();
+                            _isPanelVisible = false;
+                          } else if (_panelWidth > MediaQuery.of(context).size.width) {
+                            _panelWidth = MediaQuery.of(context).size.width;
+                          }
+                        }
+                      });
+                    },
+                    child: Row(
                       children: [
-                        const Text(
-                          "Đèn 1",
-                          style: TextStyle(color: Colors.white),
+                        Container(
+                          width: _panelWidth,
+                          color: primary100,
+                          child: ListView(
+                            padding: EdgeInsets.zero,
+                            children: [
+                              const SizedBox(height: 50),
+                              Text(
+                                'Bảng điều khiển',
+                                style: TextStyle(
+                                  color: primary700,
+                                  fontSize: 24,
+                                ),
+                              ),
+                             ListView(
+                                shrinkWrap: true,
+                                children: [
+                                  _panelWidth < 700 ?
+                                      Column(
+                                        children: [
+                                          const SizedBox(
+                                              width: 400,
+                                              child: TrafficLineChart()),
+                                          SizedBox(
+                                              width: 300,
+                                              child: buildControlPanel()),
+                                        ],
+                                      )
+                                      : Row(
+                                    children: [
+                                      const SizedBox(
+                                          width: 400,
+                                          child: TrafficLineChart()),
+                                      SizedBox(
+                                          width: 300,
+                                          child: buildControlPanel()),
+                                    ],)
+                                ],
+                             )
+
+                            ],
+                          ),
                         ),
-                        buildTrafficLight(currentTimer1, currentIndex1),
-                        buildTimer(true),
+                        GestureDetector(
+                          onTap: _toggleDrawer,
+                          child: Container(
+                            width: 20,
+                            height: double.infinity,
+                            color: primary100,
+                            child: Center(
+                              child: Icon(
+                                Icons.arrow_forward_ios,
+                                color: primary700,
+                                  size: 15
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Background
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/background3.jpg',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          buildLane(1, lane1),
+                          buildLane(3, lane3),
+                        ],
+                      ),
+                    ),
+
+                    // Center(
+                    //   child: TextField(
+                    //     decoration: InputDecoration(
+                    //       labelText: "Set den 1",
+                    //       suffixIcon: IconButton(
+                    //         icon: Icon(Icons.check),
+                    //         onPressed: () {
+                    //           String temp = controller3.text;
+                    //           int index = int.parse(temp.split(" ")[0]);
+                    //           int timer = int.parse(temp.split(" ")[1]);
+                    //           updateState(index, timer);
+                    //         },
+                    //       ),
+                    //     ),
+                    //     controller: controller3,
+                    //   ),
+                    // ),
+
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          buildLane(4, lane4),
+                          buildLane(2, lane2),
+                        ],
+                      ),
+                    ),
+
+                    // Đèn giao thông 1
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                children: [
+                                  const Text(
+                                    "Đèn 1",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  buildTrafficLight(currentTimer1, currentIndex1),
+                                  buildTimer(true, isShowAll),
+                                ],
+                              ),
+                              // Center(
+                              //     child: Container(
+                              //       decoration: BoxDecoration(
+                              //         color: Colors.white,
+                              //         borderRadius: BorderRadius.circular(10),
+                              //       ),
+                              //       child: Column(
+                              //         children: [
+                              //           const Text(
+                              //             "Làn 1:",
+                              //             style: TextStyle(color: Colors.white),
+                              //           ),
+                              //           Text("Số xe: $lane1", style: TextStyle(color: Colors.black)),
+                              //         ],
+                              //       ),
+                              //     )),
+                              // Đèn giao thông 2
+                              Column(
+                                children: [
+                                  const Text(
+                                    "Đèn 2",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  buildTrafficLight(currentTimer2, currentIndex2),
+                                  buildTimer(false, isShowAll),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                children: [
+                                  const Text(
+                                    "Đèn 4",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  buildTrafficLight(currentTimer2, currentIndex2),
+                                  buildTimer(false, isShowAll),
+                                ],
+                              ),
+                              Column(
+                                children: [
+                                  const Text(
+                                    "Đèn 3",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  buildTrafficLight(currentTimer1, currentIndex1),
+                                  buildTimer(true, isShowAll),
+                                ],
+                              ),
+
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                     // Center(
                     //     child: Container(
@@ -356,92 +542,19 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
                     //         color: Colors.white,
                     //         borderRadius: BorderRadius.circular(10),
                     //       ),
-                    //       child: Column(
-                    //         children: [
-                    //           const Text(
-                    //             "Làn 1:",
-                    //             style: TextStyle(color: Colors.white),
-                    //           ),
-                    //           Text("Số xe: $lane1", style: TextStyle(color: Colors.black)),
-                    //         ],
-                    //       ),
-                    //     )),
-                    // Đèn giao thông 2
-                    Column(
-                      children: [
-                        const Text(
-                          "Đèn 2",
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        buildTrafficLight(currentTimer2, currentIndex2),
-                        buildTimer(false),
-                      ],
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Column(
-                      children: [
-                        const Text(
-                          "Đèn 4",
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        buildTrafficLight(currentTimer2, currentIndex2),
-                        buildTimer(false),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text(
-                          "Đèn 3",
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        buildTrafficLight(currentTimer1, currentIndex1),
-                        buildTimer(true),
-                      ],
-                    ),
+                    //         width: 300,
+                    //         height: 300,
+                    //         child: buildChart(context)))
 
                   ],
                 ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: controlPanelPosition.dx,
-            top: controlPanelPosition.dy,
-            child: Draggable(
-              feedback: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
               ),
-              childWhenDragging: Container(
-                width: 200,
-                height: 200,
-              ),
-              onDragEnd: (details) {
-                setState(() {
-                  controlPanelPosition = details.offset;
-                });
-              },
-              child: buildControlPanel(),
-            ),
+            ],
           ),
-
-          Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                  width: 300,
-                  height: 300,
-                  child: TrafficLineChart()))
+          Positioned(top: 10, left: 10, child:
+          IconButton(onPressed: () {
+            _toggleDrawer();
+          }, icon: Icon(Icons.menu, color: Color.fromARGB(255, 77,77,55), size: 30))),
         ],
       ),
     );
@@ -540,17 +653,13 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
   Widget buildControlPanel() {
     return Container(
       padding: const EdgeInsets.all(10),
-      width: 200,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         children: [
-          const Text(
-            "Bảng điều khiển",
-            style: TextStyle(color: Colors.black),
-          ),
+
           TextField(
             decoration: InputDecoration(
               labelText: "Đèn 1 và 3",
@@ -593,6 +702,19 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
               }),
             ],
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Hiện tất cả số đèn"),
+              Switch(
+                  value: isShowAll,
+                  onChanged: (value) {
+                    setState(() {
+                      isShowAll = value;
+                    });
+                  }),
+            ],
+          ),
         (currentIndex1 != 1 && currentIndex2 != 1) ?
             ElevatedButton(
                 onPressed: () {
@@ -612,7 +734,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
     );
   }
 
-  Widget buildTimer(bool isOdd) {
+  Widget buildTimer(bool isOdd, bool isShowAll) {
     int redTimer;
     int greenTimer;
     String text;
@@ -649,6 +771,15 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> {
       {
         text = "Đèn đỏ: $redTimer2 s";
       }
+    }
+
+    if (isShowAll) {
+        if (isOdd){
+          text = "Đèn xanh: ${greenTimer1}s | Đèn đỏ: ${redTimer1}s";
+        }
+        else {
+          text = "Đèn xanh: ${greenTimer2}s | Đèn đỏ: ${redTimer2}s";
+        }
     }
     return Container(
       padding: const EdgeInsets.all(10),

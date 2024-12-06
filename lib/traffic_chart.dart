@@ -10,6 +10,8 @@ class VehicleDataPoint {
 }
 
 class TrafficLineChart extends StatefulWidget {
+  const TrafficLineChart({super.key});
+
   @override
   TrafficLineChartState createState() => TrafficLineChartState();
 }
