@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_database/firebase_database.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
@@ -33,10 +35,10 @@ class TrafficSimulationScreen extends StatefulWidget {
 }
 
 class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with SingleTickerProviderStateMixin{
-  late DatabaseReference ref1;
-  late DatabaseReference ref2;
-  late DatabaseReference ref3;
-  late DatabaseReference ref4;
+  late DatabaseReference greenTime1Ref;
+  late DatabaseReference greenTime2Ref;
+  late DatabaseReference greenTime3Ref;
+  late DatabaseReference greenTime4Ref;
   late DatabaseReference lane1Ref;
   late DatabaseReference lane2Ref;
   late DatabaseReference lane3Ref;
@@ -57,6 +59,8 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   late DatabaseReference light1Color;
   late DatabaseReference light2Color;
 
+  late DatabaseReference syncWithRealDeviceRef;
+
   late AnimationController _controller;
   late Animation<Offset> _offsetAnimation;
   double _panelWidth = 250.0;
@@ -76,7 +80,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   int greenTimer2 = 7;
 
   bool isAuto = true;
-  bool isShowAll = false;
+  bool isShowAll = true;
   bool syncWithRealDevice = false;
 
   Offset controlPanelPosition = const Offset(10, 10);
@@ -95,6 +99,9 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   int lane3 = 0;
   int lane4 = 0;
 
+  bool isGreen1 = false;
+  // bool isGreen2 = false;
+
   late List<double> laneData = [0, 0, 0, 0];
   Color primary100 = Color.fromARGB(255, 247,244,234);
   Color primary700 = Color.fromARGB(255, 77,77,55);
@@ -106,21 +113,25 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     currentIndex1 = 2; // Set initial index to red
     timers1 = [greenTimer1, yellowTimer1, redTimer1];
     currentTimer1 = timers1[currentIndex1];
-    startTimer1();
+
 
     currentIndex2 = 0; // Set initial index to green
     timers2 = [greenTimer2, yellowTimer2, redTimer2];
     currentTimer2 = timers2[currentIndex2];
-    startTimer2();
+
+    startTimers();
 
     fetchTrafficLight();
     listenToIsGreenRef();
 
-    remainingTime1Ref.get().then((value) => {
+    remainingTime1Ref.get().then((value) async => {
       if (value.value != null) {
-          updateState(0, value.value as int)
+        isGreen1 = await isGreen1Ref.get().then((value) => value.value as bool),
+        updateState(isGreen1 == true ? 0 : 2,isGreen1 == true ? value.value as int : (value.value as int) - 3)
       }
     });
+
+
 
     _controller = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -151,10 +162,10 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
 
   void initializeRefs() {
     const basePath = "traffic_system/intersections/main_intersection";
-    ref1 = FirebaseDatabase.instance.ref("$basePath/lanes/1/green_time");
-    ref2 = FirebaseDatabase.instance.ref("$basePath/lanes/2/green_time");
-    ref3 = FirebaseDatabase.instance.ref("$basePath/lanes/3/green_time");
-    ref4 = FirebaseDatabase.instance.ref("$basePath/lanes/4/green_time");
+    greenTime1Ref = FirebaseDatabase.instance.ref("$basePath/lanes/1/green_time");
+    greenTime2Ref = FirebaseDatabase.instance.ref("$basePath/lanes/2/green_time");
+    greenTime3Ref = FirebaseDatabase.instance.ref("$basePath/lanes/3/green_time");
+    greenTime4Ref = FirebaseDatabase.instance.ref("$basePath/lanes/4/green_time");
 
     lane1Ref = FirebaseDatabase.instance.ref("$basePath/lanes/1/vehicle_count");
     lane2Ref = FirebaseDatabase.instance.ref("$basePath/lanes/2/vehicle_count");
@@ -174,20 +185,87 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
 
     light1Color = FirebaseDatabase.instance.ref("$basePath/color/1/light_color");
     light2Color = FirebaseDatabase.instance.ref("$basePath/color/2/light_color");
+
+    syncWithRealDeviceRef = FirebaseDatabase.instance.ref("$basePath/syncWithRealDevice");
   }
 
   void listenToIsGreenRef() {
+  //   greenTime1Ref.onValue.listen((DatabaseEvent event) {
+  //     if (isGreen1) {
+  //       print("Set timer 1 green");
+  //       setTimer1Green(greenTimer1);
+  //     }
+  //     else
+  //     {
+  //       print("Not Set timer 1 green");
+  //     }
+  //   });
+  //   greenTime2Ref.onValue.listen((DatabaseEvent event) {
+  //     if (isGreen2) {
+  //       print("Set timer 2 green");
+  //       setTimer2Green(greenTimer2);
+  //     }
+  //     else
+  //     {
+  //       print("Not Set timer 2 green");
+  //     }
+  //   });
+
     isGreen1Ref.onValue.listen((DatabaseEvent event) async {
-      bool isGreen = event.snapshot.value as bool;
-      int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
-      if (isGreen) {
-        greenChangeCounter++;
-        if (greenChangeCounter >= 3) {
-          updateState(0, remainingTime);
-          greenChangeCounter = 0;
-        }
+      bool temp = event.snapshot.value as bool;
+      print("wait");
+      await Future.delayed(const Duration(seconds: 2));
+      print("wait done ");
+      int greenTimer = await greenTime1Ref.get().then((value) => value.value as int);
+      if (temp == true) {
+        setTimer1Green(greenTimer);
+      } else {
+        setTimer2Green(greenTimer);
       }
     });
+
+    // isGreen2Ref.onValue.listen((DatabaseEvent event) async {
+    //   isGreen2 = event.snapshot.value as bool;
+    //   if (isGreen2 == true)
+    //     greenTimer2 = await greenTime2Ref.get().then((value) => value.value as int);
+    // });
+
+    // isGreen1Ref.onValue.listen((DatabaseEvent event) async {
+    //   if (!isAuto) {
+    //     return;
+    //   }
+    //   bool isGreen = event.snapshot.value as bool;
+    //   int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
+    //   if (isGreen) {
+    //     // greenChangeCounter++;
+    //     // if (greenChangeCounter >= 3) {
+    //     //   updateState(0, remainingTime);
+    //     //   greenChangeCounter = 0;
+    //     // }
+    //     setTimer1Green(greenTimer1);
+    //   }
+    // });
+
+    // isGreen2Ref.onValue.listen((DatabaseEvent event) async {
+    //   if (!isAuto) {
+    //     return;
+    //   }
+    //   bool isGreen = event.snapshot.value as bool;
+    //   int remainingTime = await remainingTime2Ref.get().then((value) => value.value as int);
+    //   if (isGreen) {
+    //     // greenChangeCounter++;
+    //     // if (greenChangeCounter >= 3) {
+    //     //   updateState(0, remainingTime);
+    //     //   greenChangeCounter = 0;
+    //     // }
+    //     print("Set timer 2 green");
+    //     setTimer2Green(greenTimer2);
+    //   }
+    //   else
+    //   {
+    //     print("Not Set timer 2 red");
+    //   }
+    // });
 
     needSyncRef.onValue.listen((DatabaseEvent event) async {
       bool needSync = event.snapshot.value as bool;
@@ -201,47 +279,49 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     });
   }
 
-  void startTimer1() {
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() {
-        currentTimer1--;
-        if (currentTimer1 <= 0) {
-          if (timerUpdated1) {
-            timers1 = [greenTimer1, yellowTimer1, redTimer1];
-            timerUpdated1 = false;
+
+  void startTimers() {
+    Future.wait([
+      Future.delayed(const Duration(seconds: 1), () {
+        setState(() {
+          currentTimer1--;
+          if (currentTimer1 < 0) {
+            if (timerUpdated1) {
+              timers1 = [greenTimer1, yellowTimer1, redTimer1];
+              timerUpdated1 = false;
+            }
+            int tempCurrentIndex = currentIndex1;
+            currentIndex1 = (currentIndex1 + 1) % 3;
+            currentTimer1 = timers1[currentIndex1];
+            if (tempCurrentIndex != currentIndex1) {
+              setFirebaseColor();
+            }
           }
-          int tempCurrentIndex = currentIndex1;
-          currentIndex1 = (currentIndex1 + 1) % 3;
-          currentTimer1 = timers1[currentIndex1];
-          if (tempCurrentIndex != currentIndex1) {
-            setFirebaseColor();
+        });
+      }),
+      Future.delayed(const Duration(seconds: 1), () {
+        setState(() {
+          currentTimer2--;
+          if (currentTimer2 < 0) {
+            if (timerUpdated2) {
+              timers2 = [greenTimer2, yellowTimer2, redTimer2];
+              timerUpdated2 = false;
+            }
+            int tempCurrentIndex2 = currentIndex2;
+            currentIndex2 = (currentIndex2 + 1) % 3;
+            currentTimer2 = timers2[currentIndex2];
+            if (tempCurrentIndex2 != currentIndex2) {
+              setFirebaseColor();
+            }
           }
-      }
-      });
-      startTimer1();
+        });
+      }),
+    ]).then((_) {
+      // Gọi lại cả hai hàm sau khi hoàn thành vòng lặp hiện tại
+      startTimers();
     });
   }
 
-  void startTimer2() {
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() {
-        currentTimer2--;
-        if (currentTimer2 <= 0) {
-          if (timerUpdated2) {
-            timers2 = [greenTimer2, yellowTimer2, redTimer2];
-            timerUpdated2 = false;
-          }
-          int tempCurrentIndex2 = currentIndex2;
-          currentIndex2 = (currentIndex2 + 1) % 3;
-          currentTimer2 = timers2[currentIndex2];
-          if (tempCurrentIndex2 != currentIndex2) {
-            setFirebaseColor();
-          }
-        }
-      });
-      startTimer2();
-    });
-  }
 
   void setFirebaseColor() {
     if (!syncWithRealDevice) {
@@ -297,7 +377,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
       if (index == 0) { // Đèn xanh
         currentIndex1 = index;
         currentIndex2 = 2; // Đèn đỏ
-        currentTimer2 = timer + 3;
+        currentTimer2 = timer + 4;
       } else if (index == 1) { // Đèn vàng
         currentIndex1 = index;
         currentIndex2 = 2; // Đèn đỏ
@@ -307,7 +387,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
         currentIndex1 = index;
         if (timer > 3) {
           currentIndex2 = 0; // Đèn xanh
-          currentTimer2 = timer - 3;
+          currentTimer2 = timer - 4;
         } else {
           currentIndex2 = 1; // Đèn vàng
           currentTimer2 = timer;
@@ -333,8 +413,8 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     setState(() {
       redTimer1 = red1;
       greenTimer1 = green1;
-      redTimer2 = greenTimer1 + 3;
-      greenTimer2 = redTimer1 - 3;
+      redTimer2 = greenTimer1 + 4;
+      greenTimer2 = redTimer1 - 4;
       timerUpdated1 = true;
       timerUpdated2 = true;
     });
@@ -344,8 +424,28 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     setState(() {
       redTimer2 = red2;
       greenTimer2 = green2;
-      redTimer1 = greenTimer2 + 3;
-      greenTimer1 = redTimer2 - 3;
+      redTimer1 = greenTimer2 + 4;
+      greenTimer1 = redTimer2 - 4;
+      timerUpdated2 = true;
+      timerUpdated1 = true;
+    });
+  }
+
+  void setTimer1Green(int green1) {
+    print("Set timer 1 green");
+    setState(() {
+      greenTimer1 = green1;
+      redTimer2 = greenTimer1 + 4;
+      timerUpdated1 = true;
+      timerUpdated2 = true;
+    });
+  }
+
+  void setTimer2Green(int green2) {
+    setState(() {
+      print("Set timer 2 green");
+      greenTimer2 = green2;
+      redTimer1 = greenTimer2 + 4;
       timerUpdated2 = true;
       timerUpdated1 = true;
     });
@@ -594,7 +694,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
               child: Center(
                   child: Text(
                 '$currentTimer',
-                style: TextStyle(fontSize: 30, color: Colors.white),
+                style: const TextStyle(fontSize: 30, color: Colors.white),
               ))),
         ],
       ),
@@ -614,19 +714,21 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   }
 
   void fetchTrafficLight() {
-    ref1.onValue.listen((DatabaseEvent event) async {
-      int newTimer1 = event.snapshot.value as int;
-      DataSnapshot snapshot2 = await ref2.get();
-      int newTimer2 = snapshot2.value as int;
-      setTimer1(newTimer1, newTimer2);
-    });
-
-    ref2.onValue.listen((DatabaseEvent event) async {
-      int newTimer2 = event.snapshot.value as int;
-      DataSnapshot snapshot1 = await ref1.get();
-      int newTimer1 = snapshot1.value as int;
-      setTimer2(newTimer2, newTimer1);
-    });
+    // greenTime1Ref.onValue.listen((DatabaseEvent event) async {
+    //   int newTimer1 = event.snapshot.value as int;
+    //   DataSnapshot snapshot2 = await greenTime2Ref.get();
+    //   int newTimer2 = snapshot2.value as int;
+    //   setTimer1(newTimer1, newTimer2);
+    // });
+    //
+    // greenTime2Ref.onValue.listen((DatabaseEvent event) async {
+    //   int newTimer2 = event.snapshot.value as int;
+    //   DataSnapshot snapshot1 = await greenTime1Ref.get();
+    //   int newTimer1 = snapshot1.value as int;
+    //   setTimer2(newTimer2, newTimer1);
+    // });
+    setTimer1Green(10);
+    setTimer2Green(10);
 
     lane1Ref.onValue.listen((DatabaseEvent event) {
       setState(() {
@@ -683,8 +785,9 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
               suffixIcon: IconButton(
                 icon: Icon(Icons.check),
                 onPressed: () {
-                  ref1.set(int.parse(controller.text));
-                  ref3.set(int.parse(controller.text));
+                  // greenTime1Ref.set(int.parse(controller.text));
+                  // greenTime3Ref.set(int.parse(controller.text));
+                  setTimer1Green(int.parse(controller.text));
                   setAuto(false);
                 },
               ),
@@ -697,8 +800,9 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
               suffixIcon: IconButton(
                 icon: Icon(Icons.check),
                 onPressed: () {
-                  ref4.set(int.parse(controller2.text));
-                  ref2.set(int.parse(controller2.text));
+                  // greenTime4Ref.set(int.parse(controller2.text));
+                  // greenTime2Ref.set(int.parse(controller2.text));
+                  setTimer2Green(int.parse(controller2.text));
                   setAuto(false);
                 },
               ),
@@ -741,6 +845,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                   onChanged: (value) {
                     setState(() {
                       syncWithRealDevice = value;
+                      syncWithRealDeviceRef.set(value);
                     });
                   }),
             ],
