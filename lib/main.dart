@@ -54,6 +54,9 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   late DatabaseReference isGreen4Ref;
   late DatabaseReference needSyncRef;
 
+  late DatabaseReference light1Color;
+  late DatabaseReference light2Color;
+
   late AnimationController _controller;
   late Animation<Offset> _offsetAnimation;
   double _panelWidth = 250.0;
@@ -74,6 +77,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
 
   bool isAuto = true;
   bool isShowAll = false;
+  bool syncWithRealDevice = false;
 
   Offset controlPanelPosition = const Offset(10, 10);
   late int currentTimer1; // 0 - Green, 1 - Yellow, 2 - Red
@@ -111,6 +115,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
 
     fetchTrafficLight();
     listenToIsGreenRef();
+
     remainingTime1Ref.get().then((value) => {
       if (value.value != null) {
           updateState(0, value.value as int)
@@ -166,6 +171,9 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     isGreen3Ref = FirebaseDatabase.instance.ref("$basePath/lanes/3/is_green");
     isGreen4Ref = FirebaseDatabase.instance.ref("$basePath/lanes/4/is_green");
     needSyncRef = FirebaseDatabase.instance.ref("$basePath/needSync");
+
+    light1Color = FirebaseDatabase.instance.ref("$basePath/color/1/light_color");
+    light2Color = FirebaseDatabase.instance.ref("$basePath/color/2/light_color");
   }
 
   void listenToIsGreenRef() {
@@ -202,9 +210,13 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
             timers1 = [greenTimer1, yellowTimer1, redTimer1];
             timerUpdated1 = false;
           }
+          int tempCurrentIndex = currentIndex1;
           currentIndex1 = (currentIndex1 + 1) % 3;
           currentTimer1 = timers1[currentIndex1];
-        }
+          if (tempCurrentIndex != currentIndex1) {
+            setFirebaseColor();
+          }
+      }
       });
       startTimer1();
     });
@@ -219,12 +231,24 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
             timers2 = [greenTimer2, yellowTimer2, redTimer2];
             timerUpdated2 = false;
           }
+          int tempCurrentIndex2 = currentIndex2;
           currentIndex2 = (currentIndex2 + 1) % 3;
           currentTimer2 = timers2[currentIndex2];
+          if (tempCurrentIndex2 != currentIndex2) {
+            setFirebaseColor();
+          }
         }
       });
       startTimer2();
     });
+  }
+
+  void setFirebaseColor() {
+    if (!syncWithRealDevice) {
+      return;
+    }
+    light1Color.set(indexToText(currentIndex1));
+    light2Color.set(indexToText(currentIndex2));
   }
 
   void nextCycle() {
@@ -290,7 +314,18 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
         }
       }
       currentTimer1 = timer;
+      setFirebaseColor();
     });
+  }
+
+  String indexToText(int index) {
+    if (index == 0) {
+      return "Green";
+    } else if (index == 1) {
+      return "Yellow";
+    } else {
+      return "Red";
+    }
   }
 
 
@@ -431,24 +466,6 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                         ],
                       ),
                     ),
-
-                    // Center(
-                    //   child: TextField(
-                    //     decoration: InputDecoration(
-                    //       labelText: "Set den 1",
-                    //       suffixIcon: IconButton(
-                    //         icon: Icon(Icons.check),
-                    //         onPressed: () {
-                    //           String temp = controller3.text;
-                    //           int index = int.parse(temp.split(" ")[0]);
-                    //           int timer = int.parse(temp.split(" ")[1]);
-                    //           updateState(index, timer);
-                    //         },
-                    //       ),
-                    //     ),
-                    //     controller: controller3,
-                    //   ),
-                    // ),
 
                     Center(
                       child: Row(
@@ -711,6 +728,19 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                   onChanged: (value) {
                     setState(() {
                       isShowAll = value;
+                    });
+                  }),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Đồng bộ với thiết bị thực"),
+              Switch(
+                  value: syncWithRealDevice,
+                  onChanged: (value) {
+                    setState(() {
+                      syncWithRealDevice = value;
                     });
                   }),
             ],
