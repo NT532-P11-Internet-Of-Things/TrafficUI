@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:traffic/traffic_light.dart';
 import 'firebase_options.dart';
 import 'traffic_chart.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
+  await dotenv.load();
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

@@ -1,6 +1,9 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:http/http.dart' as http;
+import 'dart:async';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class VehicleDataPoint {
   final double count;
@@ -19,12 +22,67 @@ class TrafficLineChart extends StatefulWidget {
 class TrafficLineChartState extends State<TrafficLineChart> {
   List<List<VehicleDataPoint>> laneVehicleHistory = List.generate(4, (_) => []);
   List<double> lastKnownVehicleCounts = List.filled(4, 0);
-  static const int MINUTES_TO_KEEP = 10;
+  static const int MINUTES_TO_KEEP = 5;
+  static const double TRAFFIC_THRESHOLD = 10.0;
+  static const int ALERT_RESEND_INTERVAL = 5; // Resend alert every 5 minutes if traffic is still high
+
+  String TELEGRAM_BOT_TOKEN = dotenv.env['TELEGRAM_BOT_TOKEN']!;
+  String TELEGRAM_CHAT_ID = dotenv.env['TELEGRAM_CHAT_ID']!;
+
+  // Track threshold time for each lane
+  List<DateTime?> thresholdStartTimes = List.filled(4, null);
+  List<DateTime?> lastAlertTimes = List.filled(4, null);
 
   @override
   void initState() {
     super.initState();
     _setupFirebaseListener();
+  }
+
+  Future<void> sendTelegramAlert(List<int> highTrafficLanes, List<double> trafficCounts) async {
+    DateTime currentTime = DateTime.now();
+
+    // Prepare multi-lane alert message
+    StringBuffer messageBuffer = StringBuffer();
+    messageBuffer.write('🚨 TRAFFIC ALERT! 🚦\n\n');
+
+    for (int i = 0; i < highTrafficLanes.length; i++) {
+      int laneNumber = highTrafficLanes[i];
+      double trafficCount = trafficCounts[i];
+
+      // Check if we should send a new alert for this lane
+      if (lastAlertTimes[laneNumber-1] != null) {
+        Duration timeSinceLastAlert = currentTime.difference(lastAlertTimes[laneNumber-1]!);
+        if (timeSinceLastAlert.inMinutes < ALERT_RESEND_INTERVAL) {
+          continue;
+        }
+      }
+
+      // Add lane-specific message
+      messageBuffer.write('🚗 Lane $laneNumber: ${trafficCount.toStringAsFixed(1)} vehicles\n');
+
+      // Update last alert time for this lane
+      lastAlertTimes[laneNumber-1] = currentTime;
+    }
+
+    // If no lanes need new alerts, return
+    if (messageBuffer.toString() == '🚨 TRAFFIC ALERT! 🚦\n\n') {
+      return;
+    }
+
+    messageBuffer.write('\n⏰ Continuous high traffic detected! 😱');
+
+    try {
+      final response = await http.get(Uri.parse(
+          'https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage?chat_id=$TELEGRAM_CHAT_ID&text=${Uri.encodeComponent(messageBuffer.toString())}'
+      ));
+
+      if (response.statusCode == 200) {
+        print('Sent Telegram alerts for high traffic lanes');
+      }
+    } catch (e) {
+      print('Error sending Telegram alert: $e');
+    }
   }
 
   void _setupFirebaseListener() {
@@ -38,6 +96,10 @@ class TrafficLineChartState extends State<TrafficLineChart> {
       DateTime currentTime = DateTime.now();
       bool needsUpdate = false;
 
+      // Track high traffic lanes
+      List<int> highTrafficLanes = [];
+      List<double> highTrafficCounts = [];
+
       for (int i = 1; i < lanes.length; i++) {
         if (lanes[i] == null) continue;
 
@@ -46,12 +108,35 @@ class TrafficLineChartState extends State<TrafficLineChart> {
           needsUpdate = true;
           lastKnownVehicleCounts[i-1] = vehicleCount;
 
+          // Check traffic threshold
+          if (vehicleCount > TRAFFIC_THRESHOLD) {
+            if (thresholdStartTimes[i-1] == null) {
+              // Start counting threshold time
+              thresholdStartTimes[i-1] = currentTime;
+            } else {
+              // Check if threshold exceeded for 60 seconds
+              Duration overThresholdDuration = currentTime.difference(thresholdStartTimes[i-1]!);
+              if (overThresholdDuration.inSeconds >= 60) {
+                highTrafficLanes.add(i);
+                highTrafficCounts.add(vehicleCount);
+              }
+            }
+          } else {
+            // Reset tracking when traffic drops below threshold
+            thresholdStartTimes[i-1] = null;
+          }
+
           // Remove data points older than MINUTES_TO_KEEP minutes
           laneVehicleHistory[i-1].removeWhere((point) =>
           currentTime.difference(point.timestamp).inMinutes >= MINUTES_TO_KEEP);
 
           laneVehicleHistory[i-1].add(VehicleDataPoint(vehicleCount, currentTime));
         }
+      }
+
+      // Send alert if there are high traffic lanes
+      if (highTrafficLanes.isNotEmpty) {
+        sendTelegramAlert(highTrafficLanes, highTrafficCounts);
       }
 
       if (needsUpdate) {
