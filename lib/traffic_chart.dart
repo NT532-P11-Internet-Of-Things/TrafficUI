@@ -32,7 +32,6 @@ class TrafficLineChartState extends State<TrafficLineChart> {
   // Track threshold time for each lane
   List<DateTime?> thresholdStartTimes = List.filled(4, null);
   List<DateTime?> lastAlertTimes = List.filled(4, null);
-  static const int MINUTES_TO_KEEP = 1;
 
   @override
   void initState() {
