@@ -8,8 +8,10 @@ import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'green_light_chart.dart';
 import 'traffic_chart.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
+  await dotenv.load();
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
