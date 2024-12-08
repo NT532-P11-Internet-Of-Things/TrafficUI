@@ -282,10 +282,15 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     needSyncRef.onValue.listen((DatabaseEvent event) async {
       bool needSync = event.snapshot.value as bool;
       if (needSync) {
-        // updateState(2, 3);
-        bool isGreen = await isGreen1Ref.get().then((value) => value.value as bool);
-        int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
-        updateState(isGreen ? 1 : 2, isGreen? 3 : remainingTime);
+        if (currentIndex1 == 0) {
+          updateState(1, 4);
+        }
+        else {
+          updateState(2, 4);
+        }
+        // bool isGreen = await isGreen1Ref.get().then((value) => value.value as bool);
+        // int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
+        // updateState(isGreen ? 1 : 2, isGreen? 3 : remainingTime);
         needSyncRef.set(false);
       }
     });
