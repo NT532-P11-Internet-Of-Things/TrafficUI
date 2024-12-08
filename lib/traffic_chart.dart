@@ -19,7 +19,7 @@ class TrafficLineChart extends StatefulWidget {
 class TrafficLineChartState extends State<TrafficLineChart> {
   List<List<VehicleDataPoint>> laneVehicleHistory = List.generate(4, (_) => []);
   List<double> lastKnownVehicleCounts = List.filled(4, 0);
-  static const int MINUTES_TO_KEEP = 10;
+  static const int MINUTES_TO_KEEP = 1;
 
   @override
   void initState() {
@@ -64,45 +64,92 @@ class TrafficLineChartState extends State<TrafficLineChart> {
     int maxPoints = laneVehicleHistory.fold(0,
             (max, lane) => lane.length > max ? lane.length : max);
 
-    return LineChart(
-      LineChartData(
-        lineBarsData: _generateLineBarData(maxPoints),
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: maxPoints > 10 ? (maxPoints / 10).ceil().toDouble() : 1,
-              getTitlesWidget: (value, meta) {
-                int index = value.toInt();
-                if (index >= maxPoints) return const Text('');
+    return Column(
+      children: [
+        const Text('Số lượng phương tiện qua các làn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Montserrat')),
+        const SizedBox(height: 16),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              lineBarsData: _generateLineBarData(maxPoints),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: maxPoints > 10 ? (maxPoints / 10).ceil().toDouble() : 1,
+                    getTitlesWidget: (value, meta) {
+                      int index = value.toInt();
+                      if (index >= maxPoints) return const Text('');
 
-                DateTime pointTime = laneVehicleHistory
-                    .firstWhere((lane) => lane.length > index)
-                    .elementAt(index)
-                    .timestamp;
+                      DateTime pointTime = laneVehicleHistory
+                          .firstWhere((lane) => lane.length > index)
+                          .elementAt(index)
+                          .timestamp;
 
-                int secondsAgo = DateTime.now().difference(pointTime).inSeconds;
-                return Text('${secondsAgo}s',
-                    style: TextStyle(fontSize: 10));
-              },
+                      int secondsAgo = DateTime.now().difference(pointTime).inSeconds;
+                      return Text('${secondsAgo}s',
+                          style: TextStyle(fontSize: 10));
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      return Text(value.toInt().toString());
+                    },
+                  ),
+                ),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: true),
+              gridData: FlGridData(show: true),
+              minX: 0,
+              maxX: (maxPoints - 1).toDouble(),
             ),
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                return Text(value.toInt().toString());
-              },
-            ),
-          ),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
-        borderData: FlBorderData(show: true),
-        gridData: FlGridData(show: true),
-        minX: 0,
-        maxX: (maxPoints - 1).toDouble(),
-      ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLegendItem(Colors.blue, 'Làn 1'),
+                  const SizedBox(width: 16),
+                  _buildLegendItem(Colors.green, 'Làn 2'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLegendItem(Colors.red, 'Làn 3'),
+                  const SizedBox(width: 16),
+                  _buildLegendItem(Colors.purple, 'Làn 4'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Text(text),
+      ],
     );
   }
 
@@ -129,8 +176,12 @@ class TrafficLineChartState extends State<TrafficLineChart> {
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 1.7,
-      child: Padding(
+      aspectRatio: 1.2,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: Colors.white,
+        ),
         padding: const EdgeInsets.all(16),
         child: buildChart(context),
       ),

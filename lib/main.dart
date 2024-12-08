@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:firebase_database/firebase_database.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:async/async.dart';
+import 'green_light_chart.dart';
 import 'traffic_chart.dart';
 
 void main() async {
@@ -60,10 +59,11 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   late DatabaseReference light2Color;
 
   late DatabaseReference syncWithRealDeviceRef;
+  late DatabaseReference syncWithFirebaseRemainingTimeRef;
 
   late AnimationController _controller;
   late Animation<Offset> _offsetAnimation;
-  double _panelWidth = 250.0;
+  double _panelWidth = 300.0;
   bool _isPanelVisible = true;
   final double _minPanelWidth = 150.0;
 
@@ -81,7 +81,13 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
 
   bool isAuto = true;
   bool isShowAll = true;
+  bool isShowInfo = true;
+  bool isShowTrafficLightLine = true;
+  bool isShowLaneCount = true;
   bool syncWithRealDevice = false;
+  bool syncWithFirebaseRemainingTimeToggleValue = true;
+  bool syncWithFirebaseRemainingTimeVariableInFirebase = true;
+  String syncWithFirebaseRemainingTimeText = "Đồng bộ với thời gian còn lại";
 
   Offset controlPanelPosition = const Offset(10, 10);
   late int currentTimer1; // 0 - Green, 1 - Yellow, 2 - Red
@@ -118,6 +124,8 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     currentIndex2 = 0; // Set initial index to green
     timers2 = [greenTimer2, yellowTimer2, redTimer2];
     currentTimer2 = timers2[currentIndex2];
+
+    syncWithFirebaseRemainingTimeRef.set(true);
 
     startTimers();
 
@@ -187,6 +195,8 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     light2Color = FirebaseDatabase.instance.ref("$basePath/color/2/light_color");
 
     syncWithRealDeviceRef = FirebaseDatabase.instance.ref("$basePath/syncWithRealDevice");
+    syncWithFirebaseRemainingTimeRef = FirebaseDatabase.instance.ref("$basePath/syncWithFirebaseRemainingTime");
+
   }
 
   void listenToIsGreenRef() {
@@ -275,6 +285,41 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
         int remainingTime = await remainingTime1Ref.get().then((value) => value.value as int);
         updateState(isGreen ? 1 : 2, isGreen? 3 : remainingTime);
         needSyncRef.set(false);
+      }
+    });
+
+    remainingTime1Ref.onValue.listen((DatabaseEvent event) async {
+      if (!syncWithFirebaseRemainingTimeToggleValue) {
+        return;
+      }
+      int remainingTime = event.snapshot.value as int;
+      bool isGreen = await isGreen1Ref.get().then((value) => value.value as bool);
+
+      if (isGreen) {
+        updateState(0, remainingTime);
+        syncWithFirebaseRemainingTimeToggleValue = false;
+        syncWithFirebaseRemainingTimeText = "Đồng bộ xong";
+        setState(() {});
+        Timer(const Duration(seconds: 3), () {
+          syncWithFirebaseRemainingTimeText = "Đồng bộ với thời gian còn lại";
+          setState(() {});
+          syncWithFirebaseRemainingTimeRef.set(false);
+        });
+      }
+      else {
+        syncWithFirebaseRemainingTimeText = "Đang đồng bộ";
+        setState(() {});
+      }
+
+    });
+
+    syncWithFirebaseRemainingTimeRef.onValue.listen((DatabaseEvent event) {
+      syncWithFirebaseRemainingTimeVariableInFirebase = event.snapshot.value as bool;
+      if (syncWithFirebaseRemainingTimeVariableInFirebase && !syncWithFirebaseRemainingTimeToggleValue) {
+        setState(() {
+          syncWithFirebaseRemainingTimeToggleValue = true;
+          print("Set syncWithFirebaseRemainingTimeToggleValue to true");
+        });
       }
     });
   }
@@ -485,10 +530,13 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                     child: Row(
                       children: [
                         Container(
+                          padding: const EdgeInsets.only(
+                              top: 10, bottom: 10, left: 10
+                          ),
                           width: _panelWidth,
                           color: primary100,
                           child: ListView(
-                            padding: EdgeInsets.zero,
+                            padding: EdgeInsets.all(10),
                             children: [
                               const SizedBox(height: 50),
                               Text(
@@ -496,8 +544,10 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                                 style: TextStyle(
                                   color: primary700,
                                   fontSize: 24,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+                             const SizedBox(height: 20),
                              ListView(
                                 shrinkWrap: true,
                                 children: [
@@ -507,19 +557,36 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                                           const SizedBox(
                                               width: 400,
                                               child: TrafficLineChart()),
+                                          const SizedBox(height: 20),
                                           SizedBox(
-                                              width: 300,
-                                              child: buildControlPanel()),
+                                              width: 400,
+                                              child: GreenTimerChart(greenTimer1: greenTimer1.toDouble(), greenTimer2: greenTimer2.toDouble())),
+                                          const SizedBox(height: 20),
+                                          SizedBox(
+                                              width: 400,
+                                              child: buildControlPanel()
+                                          )
                                         ],
                                       )
                                       : Row(
                                     children: [
-                                      const SizedBox(
-                                          width: 400,
-                                          child: TrafficLineChart()),
-                                      SizedBox(
-                                          width: 300,
-                                          child: buildControlPanel()),
+                                      Expanded(
+                                        child: Column(
+                                          children: [
+                                            const SizedBox(
+                                                width: 400,
+                                                child: TrafficLineChart()),
+                                            const SizedBox(height: 20),
+                                            SizedBox(
+                                                width: 400,
+                                                child: GreenTimerChart(greenTimer1: greenTimer1.toDouble(), greenTimer2: greenTimer2.toDouble())),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 20),
+                                      Expanded(
+                                        child: buildControlPanel(),
+                                      )
                                     ],)
                                 ],
                              )
@@ -557,11 +624,72 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                         fit: BoxFit.cover,
                       ),
                     ),
+
+                    Center(
+                      child: Visibility(
+                        visible: isShowTrafficLightLine,
+                        child: Stack(
+                          children: [
+                            // Các widget khác trong Stack
+                            Visibility(
+                              visible: isShowTrafficLightLine,
+                              child: Center( // Giữ widget ở giữa màn hình
+                                child: SizedBox(
+                                  width: 300,
+                                  height: 300,
+                                  child: Stack(
+                                    children: [
+                                      // Thanh trên
+                                      Align(
+                                        alignment: Alignment.topCenter,
+                                        child: Container(
+                                          width: 120,
+                                          height: 20,
+                                          color: currentIndex1 == 0 ? Colors.green : currentIndex1 == 1 ? Colors.yellow : Colors.red,
+                                        ),
+                                      ),
+                                      // Thanh dưới
+                                      Align(
+                                        alignment: Alignment.bottomCenter,
+                                        child: Container(
+                                          width: 120,
+                                          height: 20,
+                                          color: currentIndex1 == 0 ? Colors.green : currentIndex1 == 1 ? Colors.yellow : Colors.red,
+                                        ),
+                                      ),
+                                      // Thanh trái
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Container(
+                                          width: 20,
+                                          height: 120,
+                                          color: currentIndex2 == 0 ? Colors.green : currentIndex2 == 1 ? Colors.yellow : Colors.red,
+                                        ),
+                                      ),
+                                      // Thanh phải
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Container(
+                                          width: 20,
+                                          height: 120,
+                                          color: currentIndex2 == 0 ? Colors.green : currentIndex2 == 1 ? Colors.yellow : Colors.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           buildLane(1, lane1),
+                          const SizedBox(height: 200),
                           buildLane(3, lane3),
                         ],
                       ),
@@ -572,6 +700,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           buildLane(4, lane4),
+                          const SizedBox(width: 200),
                           buildLane(2, lane2),
                         ],
                       ),
@@ -592,7 +721,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                                     style: TextStyle(color: Colors.white),
                                   ),
                                   buildTrafficLight(currentTimer1, currentIndex1),
-                                  buildTimer(true, isShowAll),
+                                  Visibility(visible: isShowInfo, child: buildTimer(true, isShowAll)),
                                 ],
                               ),
                               // Center(
@@ -619,7 +748,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                                     style: TextStyle(color: Colors.white),
                                   ),
                                   buildTrafficLight(currentTimer2, currentIndex2),
-                                  buildTimer(false, isShowAll),
+                                  Visibility(visible: isShowInfo, child: buildTimer(false, isShowAll)),
                                 ],
                               ),
                             ],
@@ -634,7 +763,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                                     style: TextStyle(color: Colors.white),
                                   ),
                                   buildTrafficLight(currentTimer2, currentIndex2),
-                                  buildTimer(false, isShowAll),
+                                  Visibility(visible: isShowInfo, child: buildTimer(false, isShowAll)),
                                 ],
                               ),
                               Column(
@@ -644,7 +773,7 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                                     style: TextStyle(color: Colors.white),
                                   ),
                                   buildTrafficLight(currentTimer1, currentIndex1),
-                                  buildTimer(true, isShowAll),
+                                  Visibility(visible: isShowInfo, child: buildTimer(true, isShowAll)),
                                 ],
                               ),
 
@@ -653,15 +782,9 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                         ],
                       ),
                     ),
-                    // Center(
-                    //     child: Container(
-                    //       decoration: BoxDecoration(
-                    //         color: Colors.white,
-                    //         borderRadius: BorderRadius.circular(10),
-                    //       ),
-                    //         width: 300,
-                    //         height: 300,
-                    //         child: buildChart(context)))
+
+                    // Thanh đèn giao thông
+
 
                   ],
                 ),
@@ -771,63 +894,38 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
 
   Widget buildControlPanel() {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-
-          TextField(
-            decoration: InputDecoration(
-              labelText: "Đèn 1 và 3",
-              suffixIcon: IconButton(
-                icon: Icon(Icons.check),
-                onPressed: () {
-                  // greenTime1Ref.set(int.parse(controller.text));
-                  // greenTime3Ref.set(int.parse(controller.text));
-                  setTimer1Green(int.parse(controller.text));
-                  setAuto(false);
-                },
-              ),
-            ),
-            controller: controller,
-          ),
-          TextField(
-            decoration: InputDecoration(
-              labelText: "Đèn 2 và 4",
-              suffixIcon: IconButton(
-                icon: Icon(Icons.check),
-                onPressed: () {
-                  // greenTime4Ref.set(int.parse(controller2.text));
-                  // greenTime2Ref.set(int.parse(controller2.text));
-                  setTimer2Green(int.parse(controller2.text));
-                  setAuto(false);
-                },
-              ),
-            ),
-            controller: controller2,
-          ),
+          const Text('Thông số', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Montserrat')),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Tự động"),
+              const Text("Hiện thông tin đèn"),
               Switch(
-                  value: isAuto,
+                  activeTrackColor: primary700,
+                  inactiveTrackColor: primary100,
+                  value: isShowInfo,
                   onChanged: (value) {
-                setState(() {
-                  setAuto(value);
-                });
-              }),
+                    setState(() {
+                      isShowInfo = value;
+                    });
+                  }),
             ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Hiện tất cả số đèn"),
+              const Text("Hiện tất cả thông tin đèn"),
               Switch(
+                  activeTrackColor: primary700,
+                  inactiveTrackColor: primary100,
                   value: isShowAll,
                   onChanged: (value) {
                     setState(() {
@@ -839,8 +937,59 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const Text("Hiện thanh đèn"),
+              Switch(
+                  activeTrackColor: primary700,
+                  inactiveTrackColor: primary100,
+                  value: isShowTrafficLightLine,
+                  onChanged: (value) {
+                    setState(() {
+                      isShowTrafficLightLine = value;
+                    });
+                  }),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Hiện số xe"),
+              Switch(
+                  activeTrackColor: primary700,
+                  inactiveTrackColor: primary100,
+                  value: isShowLaneCount,
+                  onChanged: (value) {
+                    setState(() {
+                      isShowLaneCount = value;
+                    });
+                  }),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text('Điều khiển', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Montserrat')),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Tự động"),
+              Switch(
+                  activeTrackColor: primary700,
+                  inactiveTrackColor: primary100,
+                  value: isAuto,
+                  onChanged: (value) {
+                    setState(() {
+                      setAuto(value);
+                    });
+                  }),
+            ],
+          ),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               const Text("Đồng bộ với thiết bị thực"),
               Switch(
+                  activeTrackColor: primary700,
+                  inactiveTrackColor: primary100,
                   value: syncWithRealDevice,
                   onChanged: (value) {
                     setState(() {
@@ -850,20 +999,98 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
                   }),
             ],
           ),
-        (currentIndex1 != 1 && currentIndex2 != 1) ?
-            ElevatedButton(
-                onPressed: () {
-                  nextCycle();
-                  // fetchTrafficLight();
-                },
-                child: Text("Chuyển đèn"))
-            :
-        TextButton(
+          const SizedBox(height: 10),
+          // Animated opacity
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 100),
+            opacity: syncWithRealDevice ? 1 : 0.5,
+            child: AbsorbPointer(
+              absorbing: !syncWithRealDevice,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Visibility(
+                    visible: !syncWithRealDevice,
+                    child: Text("Đồng bộ với thiết bị để sử dụng chức năng này", style: TextStyle(color: Colors.red)),
+                  ),
+                  const SizedBox(height: 10),
+                  (currentIndex1 != 1 && currentIndex2 != 1) ?
+                  FilledButton(
+                      onPressed: () {
+                        nextCycle();
+                        // fetchTrafficLight();
+                      },
+                      style: ButtonStyle(
+                        backgroundColor: MaterialStateProperty.all<Color>(primary700),
+                      ),
+                      child: const Text("Chuyển đèn", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Montserrat'))
+                  )
+                      :
+                  TextButton(
+                      onPressed: () {
+                        // fetchTrafficLight();
+                      },
+                      child: const Text("Chuyển đèn", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontFamily: 'Montserrat'))
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Cập nhật thời gian đèn xanh', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Montserrat')),
+                  TextFieldCustom(
+                      labelText: "Đèn 1 và 3",
+                      controller: controller,
+                      onPressed: () async {
+                        // greenTime1Ref.set(int.parse(controller.text));
+                        // greenTime3Ref.set(int.parse(controller.text));
+                        setTimer1Green(int.parse(controller.text));
+                        greenTime1Ref.set(int.parse(controller.text));
+                        greenTime3Ref.set(int.parse(controller.text));
+                        // bool temp = (await isGreen1Ref.get()).value as bool;
+                        // await isGreen1Ref.set(!temp);
+                        // await isGreen1Ref.set(temp);
 
-            onPressed: () {
-              // fetchTrafficLight();
-            },
-            child: Text("Chuyển đèn", style: TextStyle(color: Colors.grey)))
+
+                        setAuto(false);
+                      },
+                  ),
+                  TextFieldCustom(
+                      labelText: "Đèn 2 và 4",
+                    controller: controller2,
+                        onPressed: () async {
+                          // greenTime4Ref.set(int.parse(controller2.text));
+                          // greenTime2Ref.set(int.parse(controller2.text));
+                          setTimer2Green(int.parse(controller2.text));
+                          greenTime4Ref.set(int.parse(controller2.text));
+                          greenTime2Ref.set(int.parse(controller2.text));
+                          // bool temp = (await isGreen1Ref.get()).value as bool;
+                          // await isGreen1Ref.set(!temp);
+                          // await isGreen1Ref.set(temp);
+                          setAuto(false);
+                        },
+                      ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            ),
+          ),
+
+
+
+
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //   children: [
+          //     Text(syncWithFirebaseRemainingTimeText),
+          //     Switch(
+          //         activeTrackColor: primary700,
+          //         inactiveTrackColor: primary100,
+          //         value: syncWithFirebaseRemainingTimeToggleValue,
+          //         onChanged: (value) {
+          //           setState(() {
+          //             syncWithFirebaseRemainingTimeToggleValue = value;
+          //           });
+          //         }),
+          //   ],
+          // ),
+
         ],
       ),
     );
@@ -928,13 +1155,16 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
   }
 
   Widget buildLane(int lane, int count) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+    return Visibility(
+      visible: isShowLaneCount,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text("Làn $lane:\nSố xe: $count", style: TextStyle(color: Colors.black)),
       ),
-      child: Text("Làn $lane:\nSố xe: $count", style: TextStyle(color: Colors.black)),
     );
   }
 
@@ -943,6 +1173,42 @@ class _TrafficSimulationScreenState extends State<TrafficSimulationScreen> with 
     autoRef.set(value);
   }
 }
+
+class TextFieldCustom extends StatelessWidget {
+  const TextFieldCustom({super.key, required this.labelText, required this.controller, required this.onPressed});
+
+  final String labelText;
+  final TextEditingController controller;
+  final Future<Null> Function() onPressed;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: labelText,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            style: ButtonStyle(
+              backgroundColor: MaterialStateProperty.all<Color>(Color.fromARGB(255, 247,244,234)),
+            ),
+            onPressed: onPressed,
+            child: const Text("Cập nhật", style: TextStyle(color: Color.fromARGB(255, 77,77,55), fontWeight: FontWeight.bold, fontFamily: 'Montserrat')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 
 
